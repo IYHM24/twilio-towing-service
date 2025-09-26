@@ -1,7 +1,7 @@
 {
   "openapi": "3.0.0",
   "info": {
-    "title": "API SMS Express",
+    "title": "Service Twilio SMS API",
     "version": "1.0.0",
     "description": "Documentación de la API para envío de SMS usando Twilio"
   },

@@ -1,7 +1,7 @@
 {
   "name": "twilio-sms-calls",
   "version": "1.0.0",
-  "description": "project-root/\r │── src/\r │   ├── controllers/\r │   │   ├── sms.controller.js\r │   │   ├── voice.controller.js\r │   │   └── index.js\r │   │\r │   ├── routes/\r │   │   ├── sms.routes.js\r │   │   ├── voice.routes.js\r │   │   └── index.js\r │   │\r │   ├── services/\r │   │   ├── twilio.service.js\r │   │   └── db.service.js\r │   │\r │   ├── config/\r │   │   ├── twilio.config.js\r │   │   └── env.config.js\r │   │\r │   ├── app.js\r │   └── server.js\r │\r ├── .env\r ├── package.json\r └── README.md",
+  "description": "Servicio de IVR para una empresa de grúas utilizando Twilio",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -10,6 +10,7 @@
   "author": "Ancom",
   "license": "ISC",
   "dependencies": {
+    "dotenv": "^17.2.2",
     "express": "^5.1.0",
     "swagger-ui-express": "^5.0.1",
     "twilio": "^5.10.1"
