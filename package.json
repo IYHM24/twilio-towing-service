@@ -11,9 +11,9 @@
   "license": "ISC",
   "dependencies": {
     "express": "^5.1.0",
+    "swagger-ui-express": "^5.0.1",
     "twilio": "^5.10.1"
   },
-  "devDependencies": {},
   "repository": {
     "type": "git",
     "url": "twilio-towing-service"

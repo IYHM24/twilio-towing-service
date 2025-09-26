@@ -1,0 +1,78 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "API SMS Express",
+    "version": "1.0.0",
+    "description": "Documentación de la API para envío de SMS usando Twilio"
+  },
+  "components": {
+    "securitySchemes": {
+      "ApiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-api-key"
+      }
+    }
+  },
+  "security": [
+    {
+      "ApiKeyAuth": []
+    }
+  ],
+  "paths": {
+    "/sms/send": {
+      "post": {
+        "summary": "Enviar SMS",
+        "description": "Envía un SMS usando Twilio. Requiere autenticación por ApiKey.",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "to": {
+                    "type": "string",
+                    "example": "+573001234567"
+                  },
+                  "message": {
+                    "type": "string",
+                    "example": "Hola desde Express!"
+                  }
+                },
+                "required": ["to", "message"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "SMS enviado exitosamente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "sid": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error en la solicitud"
+          },
+          "401": {
+            "description": "ApiKey inválida o faltante"
+          }
+        }
+      }
+    }
+  }
+}
