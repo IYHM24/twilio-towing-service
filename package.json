@@ -1,0 +1,21 @@
+{
+  "name": "twilio-sms-calls",
+  "version": "1.0.0",
+  "description": "project-root/\r │── src/\r │   ├── controllers/\r │   │   ├── sms.controller.js\r │   │   ├── voice.controller.js\r │   │   └── index.js\r │   │\r │   ├── routes/\r │   │   ├── sms.routes.js\r │   │   ├── voice.routes.js\r │   │   └── index.js\r │   │\r │   ├── services/\r │   │   ├── twilio.service.js\r │   │   └── db.service.js\r │   │\r │   ├── config/\r │   │   ├── twilio.config.js\r │   │   └── env.config.js\r │   │\r │   ├── app.js\r │   └── server.js\r │\r ├── .env\r ├── package.json\r └── README.md",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "Ancom",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^5.1.0",
+    "twilio": "^5.10.1"
+  },
+  "devDependencies": {},
+  "repository": {
+    "type": "git",
+    "url": "twilio-towing-service"
+  }
+}
