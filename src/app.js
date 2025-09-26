@@ -22,10 +22,12 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
 // Rutas
 const smsRoutes = require('./routes/sms.routes');
-//const voiceRoutes = require('./routes/voice.routes');
+const callRoutes = require('./routes/call.routes');
+const twimlRoutes = require('./routes/twiml.routes');
 
 app.use('/sms', smsRoutes);
-//app.use('/voice', voiceRoutes);
+app.use('/call', callRoutes);
+app.use('/twiml', twimlRoutes);
 
 // Manejo de errores 404
 app.use((req, res, next) => {

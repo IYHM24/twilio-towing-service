@@ -4,7 +4,7 @@ const config = require('../config/config');
 
 const client = twilio(config.twilio.accountSid, config.twilio.authToken);
 
-async function sendSms(to, message) {
+const sendSms = async (to, message) => {
   try {
     const response = await client.messages.create({
       body: message,
@@ -44,6 +44,6 @@ async function sendSms(to, message) {
     };
 
   }
-}
+};
 
 module.exports = { sendSms };

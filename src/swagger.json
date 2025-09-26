@@ -1,16 +1,135 @@
 {
   "openapi": "3.0.0",
   "info": {
-    "title": "Service Twilio SMS API",
-    "version": "1.0.0",
-    "description": "Documentación de la API para envío de SMS usando Twilio"
+    "title": "Twilio Towing Service API",
+    "version": "2.0.0",
+    "description": "API completa para servicios de grúa con SMS, llamadas y sistema IVR usando Twilio",
+    "contact": {
+      "name": "Servicios de Grúa Elite",
+      "email": "soporte@gruaselite.com"
+    }
   },
+  "servers": [
+    {
+      "url": "http://localhost:3000",
+      "description": "Servidor de desarrollo"
+    },
+    {
+      "url": "https://api.gruaselite.com",
+      "description": "Servidor de producción"
+    }
+  ],
   "components": {
     "securitySchemes": {
       "ApiKeyAuth": {
         "type": "apiKey",
         "in": "header",
-        "name": "x-api-key"
+        "name": "x-api-key",
+        "description": "API Key requerida para acceder a los endpoints protegidos"
+      }
+    },
+    "schemas": {
+      "SMSRequest": {
+        "type": "object",
+        "required": ["to", "message"],
+        "properties": {
+          "to": {
+            "type": "string",
+            "pattern": "^\\+[1-9]\\d{1,14}$",
+            "example": "+573001234567",
+            "description": "Número de teléfono en formato E.164"
+          },
+          "message": {
+            "type": "string",
+            "maxLength": 1600,
+            "example": "Su vehículo está siendo remolcado. Servicio #1234",
+            "description": "Mensaje de texto a enviar"
+          }
+        }
+      },
+      "CallRequest": {
+        "type": "object",
+        "required": ["to"],
+        "properties": {
+          "to": {
+            "type": "string",
+            "pattern": "^\\+[1-9]\\d{1,14}$",
+            "example": "+573001234567",
+            "description": "Número de teléfono en formato E.164"
+          },
+          "callType": {
+            "type": "string",
+            "enum": ["main-menu", "custom", "emergency", "business-hours"],
+            "default": "main-menu",
+            "description": "Tipo de llamada a realizar"
+          },
+          "message": {
+            "type": "string",
+            "maxLength": 4000,
+            "example": "Su vehículo está siendo remolcado desde la calle 123",
+            "description": "Mensaje personalizado (requerido solo para callType: custom)"
+          },
+          "options": {
+            "type": "object",
+            "properties": {
+              "voice": {
+                "type": "string",
+                "enum": ["alice", "man", "woman"],
+                "default": "alice",
+                "description": "Voz del sistema TTS"
+              },
+              "language": {
+                "type": "string",
+                "default": "es-MX",
+                "example": "es-MX",
+                "description": "Idioma del mensaje"
+              },
+              "timeout": {
+                "type": "integer",
+                "default": 60,
+                "minimum": 5,
+                "maximum": 600,
+                "description": "Tiempo límite de la llamada en segundos"
+              },
+              "record": {
+                "type": "boolean",
+                "default": false,
+                "description": "Grabar la llamada"
+              }
+            }
+          }
+        }
+      },
+      "SuccessResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "message": {
+            "type": "string",
+            "example": "Operación exitosa"
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": false
+          },
+          "error": {
+            "type": "string",
+            "example": "Descripción del error"
+          },
+          "code": {
+            "type": "integer",
+            "example": 21408,
+            "description": "Código de error de Twilio (si aplica)"
+          }
+        }
       }
     }
   },
@@ -19,11 +138,26 @@
       "ApiKeyAuth": []
     }
   ],
+  "tags": [
+    {
+      "name": "SMS",
+      "description": "Operaciones de envío de mensajes SMS"
+    },
+    {
+      "name": "Llamadas",
+      "description": "Operaciones de llamadas telefónicas"
+    },
+    {
+      "name": "TwiML",
+      "description": "Endpoints para respuestas IVR (sin autenticación)"
+    }
+  ],
   "paths": {
     "/sms/send": {
       "post": {
+        "tags": ["SMS"],
         "summary": "Enviar SMS",
-        "description": "Envía un SMS usando Twilio. Requiere autenticación por ApiKey.",
+        "description": "Envía un mensaje SMS usando Twilio. Incluye validaciones de formato y manejo robusto de errores.",
         "security": [
           {
             "ApiKeyAuth": []
@@ -34,18 +168,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "to": {
-                    "type": "string",
-                    "example": "+573001234567"
-                  },
-                  "message": {
-                    "type": "string",
-                    "example": "Hola desde Express!"
-                  }
-                },
-                "required": ["to", "message"]
+                "$ref": "#/components/schemas/SMSRequest"
               }
             }
           }
@@ -56,20 +179,563 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": { "type": "boolean" },
-                    "sid": { "type": "string" }
-                  }
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/SuccessResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "sid": {
+                          "type": "string",
+                          "example": "SMxxxxxxxxxxxxxxxxxxxxxxxx",
+                          "description": "ID único del mensaje en Twilio"
+                        },
+                        "status": {
+                          "type": "string",
+                          "example": "queued",
+                          "description": "Estado actual del mensaje"
+                        },
+                        "to": {
+                          "type": "string",
+                          "example": "+573001234567"
+                        },
+                        "from": {
+                          "type": "string",
+                          "example": "+1234567890"
+                        }
+                      }
+                    }
+                  ]
                 }
               }
             }
           },
           "400": {
-            "description": "Error en la solicitud"
+            "description": "Error en la solicitud",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           },
           "401": {
-            "description": "ApiKey inválida o faltante"
+            "description": "API Key inválida o faltante",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Límite de velocidad excedido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/call/make": {
+      "post": {
+        "tags": ["Llamadas"],
+        "summary": "Realizar llamada",
+        "description": "Inicia una llamada telefónica con diferentes tipos de contenido (menú, mensaje personalizado, etc.)",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CallRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Llamada iniciada exitosamente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/SuccessResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "callSid": {
+                          "type": "string",
+                          "example": "CAxxxxxxxxxxxxxxxxxxxxxxxx",
+                          "description": "ID único de la llamada en Twilio"
+                        },
+                        "status": {
+                          "type": "string",
+                          "example": "queued",
+                          "description": "Estado actual de la llamada"
+                        },
+                        "to": {
+                          "type": "string",
+                          "example": "+573001234567"
+                        },
+                        "from": {
+                          "type": "string",
+                          "example": "+1234567890"
+                        },
+                        "twimlUrl": {
+                          "type": "string",
+                          "example": "http://localhost:3000/twiml/main-menu",
+                          "description": "URL del TwiML utilizado"
+                        },
+                        "callType": {
+                          "type": "string",
+                          "example": "main-menu"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error en la solicitud",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "API Key inválida o faltante"
+          }
+        }
+      }
+    },
+    "/call/status/{callSid}": {
+      "get": {
+        "tags": ["Llamadas"],
+        "summary": "Consultar estado de llamada",
+        "description": "Obtiene información detallada sobre el estado actual de una llamada",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "callSid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^CA[a-f0-9]{32}$"
+            },
+            "example": "CAxxxxxxxxxxxxxxxxxxxxxxxx",
+            "description": "ID único de la llamada en Twilio"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Estado de la llamada obtenido exitosamente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/SuccessResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "callSid": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": ["queued", "ringing", "answered", "completed", "busy", "no-answer", "failed", "canceled"]
+                        },
+                        "duration": {
+                          "type": "string",
+                          "example": "15",
+                          "description": "Duración en segundos"
+                        },
+                        "price": {
+                          "type": "string",
+                          "example": "-0.02000"
+                        },
+                        "priceUnit": {
+                          "type": "string",
+                          "example": "USD"
+                        },
+                        "direction": {
+                          "type": "string",
+                          "example": "outbound-api"
+                        },
+                        "answeredBy": {
+                          "type": "string",
+                          "enum": ["human", "machine_start", "machine_end_beep", "machine_end_silence", "machine_end_other", "fax"],
+                          "description": "Quién o qué contestó la llamada"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "CallSid inválido"
+          },
+          "401": {
+            "description": "API Key inválida o faltante"
+          }
+        }
+      }
+    },
+    "/call/hangup/{callSid}": {
+      "post": {
+        "tags": ["Llamadas"],
+        "summary": "Terminar llamada",
+        "description": "Termina una llamada activa de forma inmediata",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "callSid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^CA[a-f0-9]{32}$"
+            },
+            "example": "CAxxxxxxxxxxxxxxxxxxxxxxxx",
+            "description": "ID único de la llamada en Twilio"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Llamada terminada exitosamente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/SuccessResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "callSid": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "string",
+                          "example": "completed"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error terminando la llamada"
+          },
+          "401": {
+            "description": "API Key inválida o faltante"
+          }
+        }
+      }
+    },
+    "/call/status-webhook": {
+      "post": {
+        "tags": ["Llamadas"],
+        "summary": "Webhook de estado de llamada",
+        "description": "Endpoint para recibir actualizaciones de estado de llamadas desde Twilio (sin autenticación)",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "CallSid": {
+                    "type": "string",
+                    "example": "CAxxxxxxxxxxxxxxxxxxxxxxxx"
+                  },
+                  "CallStatus": {
+                    "type": "string",
+                    "enum": ["queued", "ringing", "answered", "completed", "busy", "no-answer", "failed", "canceled"]
+                  },
+                  "Duration": {
+                    "type": "string",
+                    "example": "15"
+                  },
+                  "AnsweredBy": {
+                    "type": "string",
+                    "enum": ["human", "machine_start", "machine_end_beep"]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Webhook procesado exitosamente"
+          }
+        }
+      }
+    },
+    "/twiml/main-menu": {
+      "get": {
+        "tags": ["TwiML"],
+        "summary": "Menú principal IVR",
+        "description": "Genera el TwiML para el menú principal del sistema IVR (sin autenticación)",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "TwiML del menú principal",
+            "content": {
+              "text/xml": {
+                "schema": {
+                  "type": "string",
+                  "example": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Response><Gather timeout=\"15\" numDigits=\"1\" action=\"/twiml/main-menu\" method=\"POST\"><Say voice=\"alice\" language=\"es-MX\">Hola, gracias por contactar a Servicios de Grúa Elite...</Say></Gather></Response>"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["TwiML"],
+        "summary": "Procesar selección del menú",
+        "description": "Procesa la selección del usuario en el menú principal",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "Digits": {
+                    "type": "string",
+                    "enum": ["0", "1", "2", "3"],
+                    "description": "Dígito presionado por el usuario"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "TwiML de respuesta según la selección",
+            "content": {
+              "text/xml": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/twiml/custom": {
+      "get": {
+        "tags": ["TwiML"],
+        "summary": "Mensaje personalizado",
+        "description": "Genera TwiML para un mensaje personalizado (sin autenticación)",
+        "security": [],
+        "parameters": [
+          {
+            "name": "message",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 4000
+            },
+            "example": "Su vehículo está siendo remolcado",
+            "description": "Mensaje a reproducir"
+          },
+          {
+            "name": "voice",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["alice", "man", "woman"],
+              "default": "alice"
+            }
+          },
+          {
+            "name": "language",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "default": "es-MX"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "TwiML del mensaje personalizado",
+            "content": {
+              "text/xml": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Parámetros inválidos"
+          }
+        }
+      }
+    },
+    "/twiml/emergency": {
+      "get": {
+        "tags": ["TwiML"],
+        "summary": "Menú de emergencias",
+        "description": "Genera TwiML para el menú de emergencias (sin autenticación)",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "TwiML del menú de emergencias",
+            "content": {
+              "text/xml": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/twiml/business-hours": {
+      "get": {
+        "tags": ["TwiML"],
+        "summary": "Información de horarios",
+        "description": "Genera TwiML con información sobre horarios de atención (sin autenticación)",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "TwiML con información de horarios",
+            "content": {
+              "text/xml": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/twiml/service-request": {
+      "post": {
+        "tags": ["TwiML"],
+        "summary": "Procesar solicitud de servicio",
+        "description": "Procesa la grabación de una solicitud de servicio (sin autenticación)",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "RecordingUrl": {
+                    "type": "string",
+                    "format": "uri",
+                    "description": "URL de la grabación"
+                  },
+                  "RecordingDuration": {
+                    "type": "string",
+                    "description": "Duración de la grabación en segundos"
+                  },
+                  "CallSid": {
+                    "type": "string",
+                    "description": "ID de la llamada"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "TwiML de confirmación de servicio",
+            "content": {
+              "text/xml": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/twiml/service-status": {
+      "post": {
+        "tags": ["TwiML"],
+        "summary": "Consultar estado del servicio",
+        "description": "Procesa la consulta de estado de servicio por ID (sin autenticación)",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "Digits": {
+                    "type": "string",
+                    "pattern": "^\\d{4}#?$",
+                    "example": "1234#",
+                    "description": "Número de referencia del servicio (4 dígitos + #)"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "TwiML con el estado del servicio",
+            "content": {
+              "text/xml": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           }
         }
       }
