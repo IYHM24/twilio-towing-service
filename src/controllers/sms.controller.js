@@ -1,7 +1,39 @@
 // src/controllers/sms.controller.js
-exports.sendSms = (req, res) => {
-  // Aquí iría la lógica para enviar SMS (ejemplo)
-  const { to, message } = req.body;
-  // Simulación de envío
-  res.json({ success: true, to, message });
+const { sendSms } = require('../services/sms.service');
+
+exports.sendSms = async (req, res) => {
+  try {
+    const { to, message } = req.body;
+    
+    // Validación básica
+    //if (!to || !message) {
+    //  return res.status(400).json({ 
+    //    success: false, 
+    //    error: 'Los campos "to" y "message" son requeridos' 
+    //  });
+    //}
+    
+    // Enviar SMS usando el servicio de Twilio
+    const result = await sendSms(to, message);
+    
+    if (result.success) {
+      res.json({ 
+        success: true, 
+        message: 'SMS enviado exitosamente',
+        sid: result.sid,
+        to,
+        body: message
+      });
+    } else {
+      res.status(400).json({ 
+        success: false, 
+        error: result.error 
+      });
+    }
+  } catch (error) {
+    res.status(500).json({ 
+      success: false, 
+      error: 'Error interno del servidor' 
+    });
+  }
 };

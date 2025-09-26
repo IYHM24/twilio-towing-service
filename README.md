@@ -5,6 +5,8 @@
 ```
 project-root/
 │── src/
+│   ├── logs/
+│   │
 │   ├── controllers/
 │   │   ├── sms.controller.js
 │   │   ├── voice.controller.js
