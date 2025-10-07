@@ -7,10 +7,28 @@ const TowingTemplates = require('./templates/towing.templates');
  */
 class TwiMLController {
   
+  /***
+   * Bienvenida y menú principal
+   *  */  
+  static welcomeMessage = (req, res) => {
+    try {
+      const companyName = process.env.COMPANY_NAME || 'Servicios de Grúa Elite';
+      const twiml = TowingTemplates.welcomeMessage(companyName);
+      res.set('Content-Type', 'text/xml');
+      res.send(twiml);
+    } catch (error) {
+      console.error('Error en bienvenida:', error);
+      const errorTwiml = TwiMLGenerator.generateErrorMessage();
+      res.set('Content-Type', 'text/xml');
+      res.send(errorTwiml);
+    }
+  }
+
+
   /**
    * Menú principal de la empresa de grúas
    */
-  static mainMenu = (req, res) => {
+  static helloMessage = (req, res) => {
     try {
       const companyName = process.env.COMPANY_NAME || 'Servicios de Grúa Elite';
       const twiml = TowingTemplates.welcomeMessage(companyName);

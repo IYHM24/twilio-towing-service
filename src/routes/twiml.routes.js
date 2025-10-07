@@ -6,6 +6,7 @@ const TwiMLController = require('../twiml/twiml.controller');
 // Rutas principales del sistema IVR
 router.get('/main-menu', TwiMLController.mainMenu);
 router.post('/main-menu', TwiMLController.processMainMenu);
+router.post('/hello', TwiMLController.helloMessage);
 
 // Rutas para manejo de servicios
 router.post('/service-request', TwiMLController.processServiceRequest);

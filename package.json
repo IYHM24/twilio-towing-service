@@ -4,7 +4,8 @@
   "description": "Servicio de IVR para una empresa de grúas utilizando Twilio",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node ./src/server.js"
   },
   "keywords": [],
   "author": "Ancom",

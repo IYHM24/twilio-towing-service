@@ -20,7 +20,8 @@ const makeCallController = async (req, res) => {
     }
     
     // Construir URL base del servidor
-    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    // Si hay una URL pública configurada, úsala, sino usa la del request
+    const baseUrl = process.env.PUBLIC_URL || `${req.protocol}://${req.get('host')}`;
     
     let twimlUrl = '';
     
