@@ -40,6 +40,7 @@ const makeCallController = async (req, res) => {
           language: options.language 
         });
         break;
+      case 'hello':
       case 'main-menu':
       case 'emergency':
       case 'business-hours':

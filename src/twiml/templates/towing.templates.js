@@ -1,21 +1,34 @@
 // src/twiml/templates/towing.templates.js
 const TwiMLGenerator = require('../twiml.generator');
+const config = require('../../config/config');
 
 /**
  * Templates específicos para empresa de grúas
  */
 class TowingTemplates {
   
+
+
   /**
    * Mensaje de bienvenida principal
    */
   static welcomeMessage = (companyName = 'Brownsquare') => {
-    const message = `Hola, gracias por contactar a ${companyName}. 
-    Presione 1 para solicitar un servicio de grúa.
-    Presione 2 para consultar el estado de su servicio.
-    Presione 3 para hablar con un operador.
-    Presione 0 para repetir este menú.`;
-    
+    const message = `
+    <Say>
+      <prosody rate="medium">
+      Hi this is ${companyName} towing. How we can help you today? 
+      Press 1. for Tow.
+      Press 2. for Jump Start.
+      Press 3. for Flat Tire with spare tire.
+      Press 4. for Lock out key.
+      Press 5. for Delivery gasoline.
+      Press 6. for Winch out.
+      Press 7. for Contact with operator.
+      Press 0. for repeat this menu.
+      </prosody>
+    </Say>
+    `;
+
     return TwiMLGenerator.generateInteractiveMenu(message, {}, {
       timeout: 15,
       numDigits: 1,
@@ -23,6 +36,23 @@ class TowingTemplates {
       timeoutMessage: 'No recibimos su selección. Conectándolo con un operador. Por favor espere.'
     });
   };
+
+  /**
+   * Mensaje Tow Option
+   */
+  static TowOption = (companyName = 'Brownsquare') => {
+    const message = ` 
+    Press 1 for Tow Wheel lift.
+    Press 2 for Tow flat bed.`;
+
+    return TwiMLGenerator.generateInteractiveMenu(message, {}, {
+      timeout: 15,
+      numDigits: 1,
+      action: '/twiml/sub-menu/tow',
+      timeoutMessage: 'No recibimos su selección. Conectándolo con un operador. Por favor espere.'
+    });
+  };
+
   
   /**
    * Mensaje para solicitar servicio de grúa
@@ -41,6 +71,9 @@ class TowingTemplates {
     });
   };
   
+
+
+
   /**
    * Mensaje para consultar estado del servicio
    */

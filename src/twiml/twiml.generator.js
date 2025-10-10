@@ -1,5 +1,6 @@
 // src/twiml/twiml.generator.js
 const VoiceResponse = require('twilio').twiml.VoiceResponse;
+const config = require('../config/config');
 
 /**
  * Generador principal de TwiML
@@ -17,8 +18,8 @@ class TwiMLGenerator {
     const twiml = new VoiceResponse();
     
     const sayOptions = {
-      voice: options.voice || 'alice',
-      language: options.language || 'es-MX',
+      voice: options.voice || config.twilio.voice,
+      language: options.language || config.twilio.language,
       loop: options.loop || 1
     };
     
@@ -51,8 +52,8 @@ class TwiMLGenerator {
     const gather = twiml.gather(gatherOptions);
     
     const sayOptions = {
-      voice: options.voice || 'alice',
-      language: options.language || 'es-MX'
+      voice: options.voice || config.twilio.voice,
+      language: options.language || config.twilio.language
     };
     
     gather.say(sayOptions, welcomeMessage);
@@ -76,8 +77,8 @@ class TwiMLGenerator {
     const twiml = new VoiceResponse();
     
     const sayOptions = {
-      voice: options.voice || 'alice',
-      language: options.language || 'es-MX'
+      voice: options.voice || config.twilio.voice,
+      language: options.language || config.twilio.language
     };
     
     try {
@@ -105,8 +106,8 @@ class TwiMLGenerator {
     const twiml = new VoiceResponse();
     
     const sayOptions = {
-      voice: options.voice || 'alice',
-      language: options.language || 'es-MX'
+      voice: options.voice || config.twilio.voice,
+      language: options.language || config.twilio.language
     };
     
     if (prompt) {
@@ -143,8 +144,8 @@ class TwiMLGenerator {
     const twiml = new VoiceResponse();
     
     const sayOptions = {
-      voice: options.voice || 'alice',
-      language: options.language || 'es-MX'
+      voice: options.voice || config.twilio.voice,
+      language: options.language || config.twilio.language
     };
     
     if (message) {
@@ -178,8 +179,8 @@ class TwiMLGenerator {
     const twiml = new VoiceResponse();
     
     const sayOptions = {
-      voice: options.voice || 'alice',
-      language: options.language || 'es-MX'
+      voice: options.voice || config.twilio.voice,
+      language: options.language || config.twilio.language
     };
     
     const defaultError = 'Lo sentimos, ha ocurrido un error. Por favor intente más tarde. Adiós.';
