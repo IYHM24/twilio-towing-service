@@ -120,15 +120,21 @@ class TwiMLGenerator {
       action: options.action || '/twiml/service-request',
       method: 'POST',
       playBeep: options.playBeep !== false,
-      transcribe: options.transcribe || false
+      transcribe: options.transcribe || false,
+      // finishOnKey: the DTMF key that will stop the recording when pressed.
+      // Set to a single digit like '1'. To disable, set finishOnKey to an empty string or false.
+      finishOnKey: (typeof options.finishOnKey !== 'undefined') ? options.finishOnKey : '1'
     };
-    
+
     twiml.record(recordOptions);
     
     // Mensaje después de la grabación
     const afterMessage = options.afterMessage || 'Gracias por su mensaje. Adiós.';
     twiml.say(sayOptions, afterMessage);
-    twiml.hangup();
+    
+    if (options.hangup && options.hangup !== false) {
+      twiml.hangup();
+    }
     
     return twiml.toString();
   };
@@ -188,6 +194,171 @@ class TwiMLGenerator {
     
     twiml.say(sayOptions, message);
     twiml.hangup();
+    
+    return twiml.toString();
+  };
+
+  /**
+   * Genera TwiML para capturar respuesta del usuario (DTMF o voz)
+   * @param {string} prompt - Mensaje que solicita la respuesta
+   * @param {object} options - Opciones de captura
+   * @returns {string} TwiML XML
+   */
+  static generateResponseCapture = (prompt, options = {}) => {
+    const twiml = new VoiceResponse();
+    
+    const sayOptions = {
+      voice: options.voice || config.twilio.voice,
+      language: options.language || config.twilio.language
+    };
+    
+    // Configuración del gather para capturar respuesta
+    const gatherOptions = {
+      timeout: options.timeout || 10,
+      numDigits: options.numDigits || 1,
+      action: options.action || '/twiml/process-response',
+      method: 'POST',
+      playBeep: options.playBeep || false,
+      finishOnKey: options.finishOnKey || '#'
+    };
+    
+    // Si se permite entrada de voz
+    if (options.speechEnabled) {
+      gatherOptions.input = 'dtmf speech';
+      gatherOptions.speechTimeout = options.speechTimeout || 'auto';
+      gatherOptions.language = options.speechLanguage || config.twilio.language;
+    } else {
+      gatherOptions.input = 'dtmf';
+    }
+    
+    const gather = twiml.gather(gatherOptions);
+    
+    // Reproducir el prompt
+    if (prompt) {
+      gather.say(sayOptions, prompt);
+    }
+    
+    // Mensaje si no hay respuesta
+    const timeoutMessage = options.timeoutMessage || 'dont receive any response. Trying again...';
+    twiml.say(sayOptions, timeoutMessage);
+    
+    // Redirigir o reintentar
+    if (options.retryAction) {
+      twiml.redirect(options.retryAction);
+    } else {
+      twiml.hangup();
+    }
+    
+    return twiml.toString();
+  };
+
+  /**
+   * Procesa la respuesta capturada y determina la siguiente acción
+   * @param {object} twilioRequest - Request de Twilio con la respuesta
+   * @param {object} responseMap - Mapeo de respuestas a acciones
+   * @returns {object} Información de la siguiente acción
+   */
+  static processUserResponse = (twilioRequest, responseMap = {}) => {
+    const digits = twilioRequest.Digits || '';
+    const speechResult = twilioRequest.SpeechResult || '';
+    const confidence = twilioRequest.Confidence || 0;
+    
+    // Procesar respuesta DTMF
+    if (digits) {
+      const action = responseMap[digits];
+      return {
+        type: 'dtmf',
+        input: digits,
+        action: action || responseMap.default || null,
+        confidence: 1.0
+      };
+    }
+    
+    // Procesar respuesta de voz
+    if (speechResult) {
+      const normalizedSpeech = speechResult.toLowerCase().trim();
+      
+      // Buscar coincidencias en el mapa de respuestas
+      for (const [key, action] of Object.entries(responseMap)) {
+        if (key !== 'default' && normalizedSpeech.includes(key.toLowerCase())) {
+          return {
+            type: 'speech',
+            input: speechResult,
+            normalizedInput: normalizedSpeech,
+            action: action,
+            confidence: parseFloat(confidence)
+          };
+        }
+      }
+      
+      return {
+        type: 'speech',
+        input: speechResult,
+        normalizedInput: normalizedSpeech,
+        action: responseMap.default || null,
+        confidence: parseFloat(confidence)
+      };
+    }
+    
+    // No hay respuesta válida
+    return {
+      type: 'no_input',
+      input: null,
+      action: responseMap.no_input || responseMap.default || null,
+      confidence: 0
+    };
+  };
+
+  /**
+   * Genera TwiML basado en la respuesta procesada
+   * @param {object} processedResponse - Respuesta procesada por processUserResponse
+   * @param {object} actionHandlers - Manejadores de acciones
+   * @param {object} options - Opciones adicionales
+   * @returns {string} TwiML XML
+   */
+  static generateNextAction = (processedResponse, actionHandlers = {}, options = {}) => {
+    const twiml = new VoiceResponse();
+    
+    const sayOptions = {
+      voice: options.voice || config.twilio.voice,
+      language: options.language || config.twilio.language
+    };
+    
+    const action = processedResponse.action;
+    
+    if (action && actionHandlers[action]) {
+      const handler = actionHandlers[action];
+      
+      // Mensaje de confirmación opcional
+      if (handler.confirmMessage) {
+        twiml.say(sayOptions, handler.confirmMessage);
+      }
+      
+      // Ejecutar la acción
+      if (handler.redirect) {
+        twiml.redirect(handler.redirect);
+      } else if (handler.message) {
+        twiml.say(sayOptions, handler.message);
+        if (handler.hangup !== false) {
+          twiml.hangup();
+        }
+      } else if (handler.gather) {
+        // Nuevo gather para capturar más información
+        const gather = twiml.gather(handler.gather.options || {});
+        gather.say(sayOptions, handler.gather.prompt);
+      }
+    } else {
+      // Acción no reconocida
+      const errorMessage = options.unrecognizedMessage || 
+        'Lo sentimos, no entendimos su respuesta. Por favor intente de nuevo.';
+      twiml.say(sayOptions, errorMessage);
+      
+      if (options.retryAction) {
+        twiml.redirect(options.retryAction);
+      } else {
+        twiml.hangup();
+      }
+    }
     
     return twiml.toString();
   };

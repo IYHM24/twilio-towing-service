@@ -54,6 +54,8 @@ class TowingTemplates {
   };
 
   
+
+  
   /**
    * Mensaje para solicitar servicio de grúa
    */

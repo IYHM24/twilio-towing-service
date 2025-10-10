@@ -2,6 +2,7 @@
 const TwiMLGenerator = require('./twiml.generator');
 const TowingTemplates = require('./templates/towing.templates');
 const config = require('../config/config');
+const WheelLiftTemplates = require('./templates/wheelLift.templates');
 
 /**
  * Controlador para manejar todas las respuestas TwiML
@@ -53,11 +54,11 @@ class TwiMLController {
 
       switch (Digits) {
         case '1':
-          // Solicitar servicio de grúa
+          // 
           twiml = TowingTemplates.TowOption();
           break;
         case '2':
-          // Consultar estado del servicio
+          // 
           twiml = TowingTemplates.checkStatus();
           break;
         case '3':
@@ -89,7 +90,7 @@ class TwiMLController {
   };
 
   /**
-   * Procesar varios submenús
+   * Menu de tow
    */
   static TowMenu = (req, res) => {
     try {
@@ -99,7 +100,7 @@ class TwiMLController {
       // Por ejemplo:
       switch (Digits) {
         case '1':
-          twiml = TowingTemplates.TowOption();
+          twiml = WheelLiftTemplates.colorAndModel();
           break;
         case '2':
           twiml = TowingTemplates.checkStatus();
@@ -118,6 +119,107 @@ class TwiMLController {
       res.send(errorTwiml);
     }
   };
+
+  static retryLiftResponse = (req, res) => {
+    try {
+      console.log('Reintentando menú tow:', req.body);
+      const { idRetry } = req.params;
+
+      switch (idRetry) {
+        case '1':
+          // Lógica para reintentar la opción 1
+          twiml = WheelLiftTemplates.colorAndModel();
+          break;
+        default:
+          break;
+      }
+      res.set('Content-Type', 'text/xml');
+      res.send(twiml);
+    } catch (error) {
+      console.error('Error reintentando menú tow:', error);
+      const errorTwiml = TwiMLGenerator.generateErrorMessage();
+      res.set('Content-Type', 'text/xml');
+      res.send(errorTwiml);
+    }
+  };
+
+  /* Procesar respuestas tow */
+  static processLiftResponses = (req, res) => {
+    try {
+      console.log('🚗 Procesando respuestas tow:', req.body);
+
+      // Extraer información de la respuesta
+      const {
+        SpeechResult, Confidence,
+        Digits, RecordingUrl,
+        RecordingDuration, CallSid
+      } = req.body;
+
+      // Mapeo de respuestas para el flujo tow
+      const responseMap = {
+        default: 'vehicle_info_captured',
+        no_input: 'retry_vehicle_info'
+      };
+
+      // Procesar la respuesta usando nuestro sistema
+      const processedResponse = TwiMLGenerator.processUserResponse(req.body, responseMap);
+
+      // Log detallado de la información capturada
+      console.log('📝 Información del vehículo capturada:');
+      if (SpeechResult) {
+        console.log(`   - Descripción por voz: "${SpeechResult}"`);
+        console.log(`   - Confianza: ${Confidence || 'N/A'}`);
+      }
+      if (Digits) {
+        console.log(`   - Dígitos presionados: ${Digits}`);
+      }
+      if (RecordingUrl) {
+        console.log(`   - Grabación disponible: ${RecordingUrl}`);
+        console.log(`   - Duración: ${RecordingDuration} segundos`);
+      }
+      console.log(`   - Call SID: ${CallSid}`);
+
+      // Extraer información del vehículo del speech result
+      let vehicleInfo = {};
+
+      if (SpeechResult) {
+        vehicleInfo.fullDescription = SpeechResult;
+      }
+
+      // Manejadores de acciones
+      const actionHandlers = {
+        vehicle_info_captured: {
+          confirmMessage: vehicleInfo.fullDescription
+            ? `Perfecto, hemos registrado su vehículo: ${vehicleInfo.fullDescription}. Ahora necesitamos su ubicación.`
+            : 'Hemos registrado la información de su vehículo. Ahora necesitamos su ubicación.',
+          redirect: '/twiml/capture-pickup-location'
+        },
+        retry_vehicle_info: {
+          message: 'No pudimos capturar la información de su vehículo. Intentemos de nuevo.',
+          redirect: '/twiml/sub-menu/tow'
+        }
+      };
+
+      // Generar siguiente acción
+      const twiml = TwiMLGenerator.generateNextAction(processedResponse, actionHandlers, {
+        unrecognizedMessage: 'Información recibida. Continuando con el siguiente paso.',
+        retryAction: '/twiml/sub-menu/tow'
+      });
+
+      // TODO: Aquí guardarías la información en base de datos
+      // await saveVehicleInfo(CallSid, vehicleInfo, RecordingUrl);
+
+      res.set('Content-Type', 'text/xml');
+      res.send(twiml);
+    } catch (error) {
+      console.error('❌ Error procesando respuestas tow:', error);
+      const errorTwiml = TwiMLGenerator.generateErrorMessage(
+        'Error procesando la información del vehículo. Conectándolo con un operador.'
+      );
+      res.set('Content-Type', 'text/xml');
+      res.send(errorTwiml);
+    }
+  }
 
   /**
    * Procesar grabación de solicitud de servicio
@@ -262,6 +364,240 @@ class TwiMLController {
       res.send(twiml);
     } catch (error) {
       console.error('Error con mensaje personalizado:', error);
+      const errorTwiml = TwiMLGenerator.generateErrorMessage();
+      res.set('Content-Type', 'text/xml');
+      res.send(errorTwiml);
+    }
+  };
+
+  /**
+   * Capturar información del cliente (ejemplo de uso de los nuevos métodos)
+   */
+  static captureClientInfo = (req, res) => {
+    try {
+      const prompt = 'Por favor, proporcione su número de teléfono presionando las teclas correspondientes, seguido de la tecla numeral.';
+
+      const options = {
+        timeout: 15,
+        numDigits: 10,
+        finishOnKey: '#',
+        action: '/twiml/process-client-info',
+        retryAction: '/twiml/capture-client-info',
+        timeoutMessage: 'No recibimos su número. Intentemos de nuevo.'
+      };
+
+      const twiml = TwiMLGenerator.generateResponseCapture(prompt, options);
+
+      res.set('Content-Type', 'text/xml');
+      res.send(twiml);
+    } catch (error) {
+      console.error('Error capturando información del cliente:', error);
+      const errorTwiml = TwiMLGenerator.generateErrorMessage();
+      res.set('Content-Type', 'text/xml');
+      res.send(errorTwiml);
+    }
+  };
+
+  /**
+   * Procesar información capturada del cliente
+   */
+  static processClientInfo = (req, res) => {
+    try {
+      // Mapeo de respuestas (no aplicable para número de teléfono, pero útil para otros casos)
+      const responseMap = {
+        default: 'confirm_phone',
+        no_input: 'retry_phone'
+      };
+
+      // Procesar la respuesta
+      const processedResponse = TwiMLGenerator.processUserResponse(req.body, responseMap);
+
+      console.log('📞 Información del cliente capturada:', processedResponse);
+
+      // Manejadores de acciones
+      const actionHandlers = {
+        confirm_phone: {
+          confirmMessage: `Gracias. Hemos registrado el número ${processedResponse.input}. Un técnico se comunicará con usted pronto.`,
+          message: 'Su solicitud ha sido procesada. Que tenga un buen día.',
+          hangup: true
+        },
+        retry_phone: {
+          redirect: '/twiml/capture-client-info'
+        }
+      };
+
+      const twiml = TwiMLGenerator.generateNextAction(processedResponse, actionHandlers);
+
+      res.set('Content-Type', 'text/xml');
+      res.send(twiml);
+    } catch (error) {
+      console.error('Error procesando información del cliente:', error);
+      const errorTwiml = TwiMLGenerator.generateErrorMessage();
+      res.set('Content-Type', 'text/xml');
+      res.send(errorTwiml);
+    }
+  };
+
+  /**
+   * Ejemplo avanzado: Captura con reconocimiento de voz
+   */
+  static captureServiceType = (req, res) => {
+    try {
+      const prompt = 'Díganos qué tipo de servicio necesita: remolque, batería, combustible, o presione 1 para remolque, 2 para batería, 3 para combustible.';
+
+      const options = {
+        timeout: 10,
+        speechEnabled: true,
+        speechTimeout: 'auto',
+        numDigits: 1,
+        finishOnKey: '#',
+        action: '/twiml/process-service-type',
+        retryAction: '/twiml/capture-service-type',
+        timeoutMessage: 'No pudimos escuchar su respuesta. Intentemos nuevamente.'
+      };
+
+      const twiml = TwiMLGenerator.generateResponseCapture(prompt, options);
+
+      res.set('Content-Type', 'text/xml');
+      res.send(twiml);
+    } catch (error) {
+      console.error('Error capturando tipo de servicio:', error);
+      const errorTwiml = TwiMLGenerator.generateErrorMessage();
+      res.set('Content-Type', 'text/xml');
+      res.send(errorTwiml);
+    }
+  };
+
+  /**
+   * Procesar tipo de servicio capturado
+   */
+  static processServiceType = (req, res) => {
+    try {
+      // Mapeo de respuestas DTMF y de voz
+      const responseMap = {
+        '1': 'towing_service',
+        '2': 'battery_service',
+        '3': 'fuel_service',
+        'remolque': 'towing_service',
+        'bateria': 'battery_service',
+        'combustible': 'fuel_service',
+        'gasolina': 'fuel_service',
+        default: 'unknown_service',
+        no_input: 'retry_service'
+      };
+
+      const processedResponse = TwiMLGenerator.processUserResponse(req.body, responseMap);
+
+      console.log('🚗 Tipo de servicio solicitado:', processedResponse);
+
+      // Manejadores de acciones específicas
+      const actionHandlers = {
+        towing_service: {
+          confirmMessage: 'Perfecto, servicio de remolque solicitado.',
+          redirect: '/twiml/capture-client-info'
+        },
+        battery_service: {
+          confirmMessage: 'Entendido, asistencia con batería.',
+          redirect: '/twiml/capture-client-info'
+        },
+        fuel_service: {
+          confirmMessage: 'Muy bien, servicio de combustible.',
+          redirect: '/twiml/capture-client-info'
+        },
+        unknown_service: {
+          message: 'No reconocimos el tipo de servicio. Conectándolo con un operador.',
+          redirect: '/twiml/connect-operator'
+        },
+        retry_service: {
+          redirect: '/twiml/capture-service-type'
+        }
+      };
+
+      const twiml = TwiMLGenerator.generateNextAction(processedResponse, actionHandlers, {
+        unrecognizedMessage: 'Tipo de servicio no reconocido. Intentemos de nuevo.',
+        retryAction: '/twiml/capture-service-type'
+      });
+
+      res.set('Content-Type', 'text/xml');
+      res.send(twiml);
+    } catch (error) {
+      console.error('Error procesando tipo de servicio:', error);
+      const errorTwiml = TwiMLGenerator.generateErrorMessage();
+      res.set('Content-Type', 'text/xml');
+      res.send(errorTwiml);
+    }
+  };
+
+  /**
+   * Capturar ubicación de recogida
+   */
+  static capturePickupLocation = (req, res) => {
+    try {
+      const prompt = 'Por favor, proporcione su dirección completa de ubicación. Incluya calle, número, ciudad. Presione 1 cuando termine de hablar.';
+
+      const options = {
+        timeout: 20,
+        speechEnabled: true,
+        speechTimeout: 'auto',
+        finishOnKey: '1',
+        action: '/twiml/process-pickup-location',
+        retryAction: '/twiml/capture-pickup-location',
+        timeoutMessage: 'No recibimos su ubicación. Intentemos de nuevo.'
+      };
+
+      const twiml = TwiMLGenerator.generateResponseCapture(prompt, options);
+
+      res.set('Content-Type', 'text/xml');
+      res.send(twiml);
+    } catch (error) {
+      console.error('Error capturando ubicación:', error);
+      const errorTwiml = TwiMLGenerator.generateErrorMessage();
+      res.set('Content-Type', 'text/xml');
+      res.send(errorTwiml);
+    }
+  };
+
+  /**
+   * Procesar ubicación de recogida
+   */
+  static processPickupLocation = (req, res) => {
+    try {
+      const { SpeechResult, Confidence, CallSid } = req.body;
+
+      console.log('📍 Ubicación capturada:');
+      console.log(`   - Dirección: "${SpeechResult || 'No capturada'}"`);
+      console.log(`   - Confianza: ${Confidence || 'N/A'}`);
+      console.log(`   - Call SID: ${CallSid}`);
+
+      const responseMap = {
+        default: 'location_captured',
+        no_input: 'retry_location'
+      };
+
+      const processedResponse = TwiMLGenerator.processUserResponse(req.body, responseMap);
+
+      const actionHandlers = {
+        location_captured: {
+          confirmMessage: SpeechResult
+            ? `Perfecto, su ubicación es: ${SpeechResult}. Un técnico se dirigirá a esa dirección.`
+            : 'Hemos registrado su ubicación.',
+          redirect: '/twiml/capture-client-info'
+        },
+        retry_location: {
+          message: 'No pudimos capturar su ubicación. Intentemos de nuevo.',
+          redirect: '/twiml/capture-pickup-location'
+        }
+      };
+
+      const twiml = TwiMLGenerator.generateNextAction(processedResponse, actionHandlers);
+
+      // TODO: Guardar ubicación en base de datos
+      // await savePickupLocation(CallSid, SpeechResult);
+
+      res.set('Content-Type', 'text/xml');
+      res.send(twiml);
+    } catch (error) {
+      console.error('Error procesando ubicación:', error);
       const errorTwiml = TwiMLGenerator.generateErrorMessage();
       res.set('Content-Type', 'text/xml');
       res.send(errorTwiml);
